@@ -27,48 +27,74 @@ async function run() {
         //////////////////////////////////
 
         //Getting products using search query
-        app.get('/products', async (req, res) => {
-            const query = {}; //Optimization needed
-            const cursor = productsCollection.find(query);
-            const products = await cursor.toArray();
+        app.get("/products", async (req, res) => {
+            let query = {}; //Optimization needed
 
+            //To search products using products name
             if (req.query.name) {
+                // query = {name: req.query.name} // Only gives result for exact match
+                const cursor = productsCollection.find(query);
+                const products = await cursor.toArray();
                 const searchText = req.query.name.toLowerCase();
-                const filteredProducts = products.filter(product => product.name.toLowerCase().includes(searchText));
+                const filteredProducts = products.filter((product) =>
+                    product.name.toLowerCase().includes(searchText)
+                );
                 res.send(filteredProducts);
             }
-            else {
+            //To get products by productsPerPage for pagination
+            else if (req.query.productsPerPage || req.query.currentPage) {
+                const productsPerPage = parseInt(req.query.productsPerPage);
+                const currentPage = parseInt(req.query.currentPage);
+                // console.log("products:", productsPerPage, "currentPage:", currentPage);
+                const cursor = productsCollection
+                    .find(query)
+                    .skip(currentPage * productsPerPage)
+                    .limit(productsPerPage);
+                const products = await cursor.toArray();
                 res.send(products);
             }
-        })
+            //To get all products
+            else {
+                const cursor = productsCollection.find(query);
+                const products = await cursor.toArray();
+                res.send(products);
+            }
+        });
 
         //Getting a single product using id parameter
-        app.get('/product/:id', async (req, res) => {
+        app.get("/product/:id", async (req, res) => {
             const productId = req.params.id;
             const query = { _id: ObjectId(productId) };
             const product = await productsCollection.findOne(query);
             res.send(product);
-        })
+        });
 
+        //To get products count
+        app.get("/productsCount", async (req, res) => {
+            const query = {};
+            const productsPerPage = parseInt(req.query.productsPerPage);
+            const countProducts = await productsCollection.countDocuments(query);
+            const pagesCount = Math.ceil(countProducts / productsPerPage);
+            res.send({ pagesCount });
+        });
 
         //////////////////////////////////
         // Insert Operations
         //////////////////////////////////
 
         //Adding single product
-        app.post('/product', async (req, res) => {
+        app.post("/product", async (req, res) => {
             const newProduct = req.body;
             const result = await productsCollection.insertOne(newProduct);
             res.send(result); // will return insertedId
-        })
+        });
 
         //Adding multiple products
-        app.post('/products', async (req, res) => {
+        app.post("/products", async (req, res) => {
             const products = req.body;
             const result = await productsCollection.insertMany(products);
             res.send(result); //will return insertedCount, insertedIds
-        })
-
+        });
 
         //////////////////////////////////
         // Update Operations
@@ -93,7 +119,6 @@ async function run() {
             res.send(result);
         });
 
-
         //////////////////////////////////
         // Delete Operations
         //////////////////////////////////
@@ -105,7 +130,6 @@ async function run() {
             const result = await productsCollection.deleteOne(query);
             res.send(result);
         });
-
     } finally {
     }
 }
